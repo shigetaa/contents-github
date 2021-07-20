@@ -1,0 +1,57 @@
+## デプロイメント 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-git-sync
+spec:
+  replicas: 1
+  selector:           # これは deployment - pod 対応用
+    matchLabels:
+      app: sidecar
+  template:           # ここからポッド・テンプレート
+    metadata:
+      labels:
+        app: sidecar      # ポッドのラベル
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        volumeMounts:
+        - mountPath: /usr/share/nginx/html
+          name: git
+          readOnly: true
+        ports:
+          - containerPort: 80
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: "0.5"
+
+      - name: git-sync
+        image: k8s.gcr.io/git-sync/git-sync:v3.2.2
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: "0.5"
+        env:
+          - name: GIT_SYNC_REPO
+            value: https://github.com/shigetaa/contents-github.git
+          - name: GIT_SYNC_WAIT
+            value: "30"
+        volumeMounts:
+        - mountPath: /tmp/git
+          name: git
+      volumes:
+      - emptyDir: {}
+        name: git
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-git-sync-svc
+spec:
+  selector:
+    app: sidecar      # これは service - pod 対応用
+  ports:
+     -  port: 8080
+        targetPort: 80
